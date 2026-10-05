@@ -1,0 +1,23 @@
+{
+  "name": "cafe-interativo",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "mcp": "node packages/mcp-cafe/src/index.ts",
+    "seed": "node packages/mcp-cafe/src/seed.ts",
+    "smoke": "node packages/mcp-cafe/src/smoke.ts",
+    "inspect": "npx @modelcontextprotocol/inspector node packages/mcp-cafe/src/index.ts",
+    "typecheck": "tsc -p ."
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "typescript": "^7.0.2"
+  }
+}

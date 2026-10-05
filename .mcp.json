@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "cafe": {
+      "command": "node",
+      "args": ["packages/mcp-cafe/src/index.ts"]
+    }
+  }
+}

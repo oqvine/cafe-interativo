@@ -21,7 +21,7 @@ O subagent responde `[emoção] fala`. Mostre assim, sem comentar:
 
 ## 3. Cada mensagem do barista (usuário)
 - **Fala normal** → SendMessage ao agente: `Barista: "<texto exato do usuário>"`. Não reescreva, não corrija.
-  **Depois do SendMessage, não escreva nada** ("passei a fala", "aguardando"…). A resposta do cliente aparece sozinha.
+  **Depois do SendMessage, seu texto inteiro é só `☕`.** Nada de "a resposta ainda não chegou", "passei a fala", "aguardando". A resposta do cliente aparece sozinha.
 - **Entrega** (começa com `servir`, `entregar` ou `toma`) → ação de barista:
   1. Converta a descrição em itens: `{itemId, size P/M/G, modifiers[]}` com ids/modificadores válidos (`mcp__cafe__get_menu` se tiver dúvida). Tamanho não dito = `M`.
   2. Ache o pedido aberto do cliente em `mcp__cafe__get_queue` (o **mais recente** dele, maior `id`). Se não houver, SendMessage `[EVENTO] O barista quer entregar, mas você ainda não registrou o pedido.` e não chame `serve`.

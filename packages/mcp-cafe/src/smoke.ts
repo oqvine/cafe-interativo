@@ -41,7 +41,12 @@ assert.ok(result.accuracy < 1 && result.issues.length === 2);
 
 await call("react", { customerId: "rafa-startup", emotion: "impaciente" });
 await call("remember", { customerId: "rafa-startup", fact: "barista errou tamanho e esqueceu o extra shot" });
-await call("close_order", { orderId: order.id, status: "pago" });
+await assert.rejects(call("close_order", { orderId: order.id, status: "pago" }), /memory/); // sem memória não fecha
+await call("close_order", { orderId: order.id, status: "pago", memory: "barista Tilam errou o tamanho" });
+const rafa = await client.readResource({ uri: "cafe://customers/rafa-startup" });
+const rafaData = JSON.parse((rafa.contents[0] as { text: string }).text);
+assert.equal(rafaData.visits, 1);
+assert.ok(rafaData.memory.includes("barista Tilam errou o tamanho"));
 
 const prompt = await client.getPrompt({ name: "play_customer", arguments: { customerId: "rafa-startup" } });
 assert.match((prompt.messages[0]!.content as { text: string }).text, /esqueceu o extra shot/);

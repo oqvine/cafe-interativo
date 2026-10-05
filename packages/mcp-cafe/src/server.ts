@@ -174,12 +174,24 @@ export function buildServer(repo: Repo): McpServer {
     "close_order",
     {
       title: "Fechar pedido",
-      description: "Marca pedido como pago ou cancelado.",
-      inputSchema: { orderId: z.number().int(), status: OrderStatus.extract(["pago", "cancelado"]) },
+      description:
+        "Encerra a visita: marca pedido como pago ou cancelado, grava a memória da visita e conta +1 visita do cliente.",
+      inputSchema: {
+        orderId: z.number().int(),
+        status: OrderStatus.extract(["pago", "cancelado"]),
+        // Obrigatório de propósito: o schema garante a memória, não depende do modelo "lembrar".
+        memory: z
+          .string()
+          .min(10)
+          .max(200)
+          .describe("1 fato curto para a próxima visita: nome do barista (se disse) e como foi"),
+      },
     },
-    async ({ orderId, status }) => {
+    async ({ orderId, status, memory }) => {
       try {
         const o = repo.updateOrder(orderId, { status });
+        repo.remember(o.customerId, memory);
+        repo.addVisit(o.customerId);
         if (status === "cancelado") repo.logEvent("cancelado", -20, { orderId });
         return json(o);
       } catch (e) {
@@ -251,7 +263,7 @@ Você está numa cafeteria falando com o barista (o jogador). Regras:
 - Quando decidir o pedido, chame create_order (consulte get_menu se precisar).
 - Ao receber o café, avalie o resultado do serve e reaja com react (emoção + gorjeta coerente).
 - Se algo marcante acontecer, use remember para lembrar na próxima visita.
-- Ao final, chame close_order com 'pago' (ou 'cancelado' se desistir).`;
+- Ao final, chame close_order com 'pago' (ou 'cancelado' se desistir) e a memória da visita.`;
   };
 
   server.registerTool(

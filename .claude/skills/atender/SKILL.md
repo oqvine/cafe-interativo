@@ -27,7 +27,8 @@ O subagent responde `[emoção] fala`. Mostre assim, sem comentar:
   2. Ache o pedido aberto do cliente em `mcp__cafe__get_queue` (o **mais recente** dele, maior `id`). Se não houver, SendMessage `[EVENTO] O barista quer entregar, mas você ainda não registrou o pedido.` e não chame `serve`.
   3. Chame `mcp__cafe__serve` com `orderId` e `prepared`.
   4. SendMessage ao agente: `[EVENTO] O barista entregou: <itens>. Avaliação: accuracy <x>, problemas: <issues ou "nenhum">.`
-  5. Mostre a fala do cliente e, embaixo, discretamente: `🎯 <points> pts · <issues>`.
+  5. Depois do SendMessage, de novo só `☕` (não anuncie pontos antes da reação).
+  6. Quando a reação chegar, mostre a fala e, embaixo, discretamente: `🎯 <points> pts · <issues>`.
 - **Comando de meta** (`/placar`, `encerrar`) → trate você mesmo, sem repassar.
 
 ## 4. Fim

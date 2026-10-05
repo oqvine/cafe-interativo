@@ -18,6 +18,11 @@ Jogo de barista: clientes são agentes Claude, voz no navegador. Projeto pessoal
   - `server.ts` define tudo, `index.ts` = stdio, `smoke.ts` = cliente MCP em memória (teste).
   - stdio: **nunca** escrever em stdout; log via `console.error`.
 
+## Claude Code (jogo dentro do chat)
+- `.claude/agents/cliente.md` — subagent (Haiku) que interpreta 1 cliente; só tools de cliente.
+- `.claude/skills/atender/` — `/atender <id>`: Claude principal orquestra (repassa falas, executa `serve`).
+- `.claude/settings.json` — habilita server `cafe` e libera `mcp__cafe__*`.
+
 ## Comandos
 - `npm run smoke` — teste ponta a ponta do MCP.
 - `npm run seed` — popula cardápio e clientes.
@@ -25,7 +30,10 @@ Jogo de barista: clientes são agentes Claude, voz no navegador. Projeto pessoal
 
 ## Roadmap
 0. ✅ monorepo + cafe-mcp
-1. 1 cliente por texto: backend spawna `claude -p` com prompt `play_customer` + cafe-mcp
+1. 1 cliente por texto
+   - 1a ✅ subagent `cliente` + skill `/atender`
+   - 1b script headless `claude -p` (precisa do CLI `claude` no PATH)
+   - 1c `apps/server` com WebSocket
 2. Voz MVP (push-to-talk)
 3. Cena cartoon SVG + emoções
 4. Director + fila + pontuação

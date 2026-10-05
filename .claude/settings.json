@@ -1,0 +1,6 @@
+{
+  "enabledMcpjsonServers": ["cafe"],
+  "permissions": {
+    "allow": ["mcp__cafe"]
+  }
+}

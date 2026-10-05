@@ -235,6 +235,42 @@ export function buildServer(repo: Repo): McpServer {
   // ---------- PROMPTS ----------
   // Prompt = template reutilizável. Vira o system prompt de cada agente-cliente.
 
+  // Texto único da persona: usado pelo prompt (clientes MCP genéricos) e pela tool
+  // get_persona (subagents do Claude Code, que só enxergam tools).
+  const customerBrief = (customerId: string): string => {
+    const c = repo.customer(customerId);
+    // Cliente novo? Cadastre antes com register_customer. Erro claro > persona inventada por engano.
+    if (!c) throw new McpError(ErrorCode.InvalidParams, `cliente '${customerId}' não existe. ids válidos: ${validIds()}`);
+    return `Você é ${c.name} (${c.archetype}) [id: ${c.id}]. ${c.persona}
+Visitas anteriores: ${c.visits}.
+Memórias: ${c.memory.join("; ") || "nenhuma"}.
+
+Você está numa cafeteria falando com o barista (o jogador). Regras:
+- Fale em português, curto (1-2 frases), como gente de verdade falando em voz alta.
+- Mantenha a personalidade o tempo todo.
+- Quando decidir o pedido, chame create_order (consulte get_menu se precisar).
+- Ao receber o café, avalie o resultado do serve e reaja com react (emoção + gorjeta coerente).
+- Se algo marcante acontecer, use remember para lembrar na próxima visita.
+- Ao final, chame close_order com 'pago' (ou 'cancelado' se desistir).`;
+  };
+
+  server.registerTool(
+    "get_persona",
+    {
+      title: "Ver persona",
+      description: "Persona, memórias e regras de comportamento de um cliente. Chame antes de interpretá-lo.",
+      inputSchema: { customerId: z.string() },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ customerId }) => {
+      try {
+        return { content: [{ type: "text" as const, text: customerBrief(customerId) }] };
+      } catch (e) {
+        return fail((e as Error).message);
+      }
+    },
+  );
+
   server.registerPrompt(
     "play_customer",
     {
@@ -244,31 +280,9 @@ export function buildServer(repo: Repo): McpServer {
         customerId: completable(z.string().describe("id do cliente, ex: dona-marta"), (typed) => suggestCustomerIds(typed)),
       },
     },
-    async ({ customerId }) => {
-      const c = repo.customer(customerId);
-      // Cliente novo? Cadastre antes com register_customer. Erro claro > persona inventada por engano.
-      if (!c) throw new McpError(ErrorCode.InvalidParams, `cliente '${customerId}' não existe. ids válidos: ${validIds()}`);
-      const persona = `Você é ${c.name} (${c.archetype}) [id: ${c.id}]. ${c.persona}\nVisitas anteriores: ${c.visits}.\nMemórias: ${c.memory.join("; ") || "nenhuma"}.`;
-      return {
-        messages: [
-          {
-            role: "user",
-            content: {
-              type: "text",
-              text: `${persona}
-
-Você está numa cafeteria falando com o barista (o jogador). Regras:
-- Fale em português, curto (1-2 frases), como gente de verdade falando em voz alta.
-- Mantenha a personalidade o tempo todo.
-- Quando decidir o pedido, chame create_order (consulte get_menu se precisar).
-- Ao receber o café, avalie o resultado do serve e reaja com react (emoção + gorjeta coerente).
-- Se algo marcante acontecer, use remember para lembrar na próxima visita.
-- Ao final, chame close_order com 'pago' (ou 'cancelado' se desistir).`,
-            },
-          },
-        ],
-      };
-    },
+    async ({ customerId }) => ({
+      messages: [{ role: "user", content: { type: "text", text: customerBrief(customerId) } }],
+    }),
   );
 
   return server;

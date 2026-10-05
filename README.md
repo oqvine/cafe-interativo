@@ -34,7 +34,7 @@ npm run seed       # popula cardápio e clientes
 npm run typecheck
 ```
 
-No Claude Code, o server `cafe` é registrado por `.mcp.json`.
+No Claude Code, o server `cafe` é registrado por `.mcp.json`. Para jogar no chat: abra uma sessão na pasta e rode `/atender dona-marta`.
 
 ## Estrutura
 
@@ -47,6 +47,9 @@ packages/
     src/db.ts       SQLite
     src/index.ts    entrada stdio
     src/smoke.ts    cliente MCP de teste
+.claude/
+  agents/cliente.md       subagent que interpreta um cliente
+  skills/atender/         /atender: orquestra o atendimento no chat
 data/          banco local (ignorado pelo git)
 ```
 

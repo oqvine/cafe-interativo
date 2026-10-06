@@ -1,6 +1,6 @@
 // "servir latte G com canela e extra shot + pão de queijo P" → OrderItem[]
 // Parser determinístico: o orquestrador em código não gasta token para entender o barista.
-import { Modifier, type MenuItem, type OrderItem, type Size } from "@cafe/shared";
+import { Modifier, type MenuItem, type OrderItem, type Size } from "./index.ts";
 
 const norm = (s: string) =>
   s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();

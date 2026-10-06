@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Café Interativo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☕</text></svg>" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">☕ Café Interativo</div>
+    <div class="topbar-right">
+      <div class="chip" id="score">0 pts</div>
+      <button class="icon-btn" id="mute" title="Voz dos clientes">🔊</button>
+    </div>
+  </header>
+
+  <main class="game">
+    <!-- CENA -->
+    <section class="scene" id="scene">
+      <div class="wall">
+        <div class="window"><div class="cloud c1"></div><div class="cloud c2"></div><div class="sun"></div></div>
+        <div class="menu-board" id="menuBoard"></div>
+        <div class="shelf"><span>🫙</span><span>🥐</span><span>🫖</span><span>🪴</span></div>
+      </div>
+
+      <div class="customer-slot" id="slot">
+        <div class="bubble hidden" id="bubble"><span id="bubbleText"></span></div>
+        <div class="customer" id="customer"></div>
+        <div class="nameplate hidden" id="nameplate"></div>
+        <div class="burst" id="burst"></div>
+      </div>
+
+      <div class="ticket hidden" id="ticket">
+        <div class="ticket-title">Pedido <span id="ticketId"></span></div>
+        <ul id="ticketItems"></ul>
+        <div class="ticket-total" id="ticketTotal"></div>
+      </div>
+
+      <div class="counter">
+        <div class="counter-top"></div>
+        <div class="cup-zone" id="cupZone"></div>
+        <div class="register">💰</div>
+      </div>
+
+      <div class="toast hidden" id="toast"></div>
+    </section>
+
+    <!-- PAINEL -->
+    <section class="panel">
+      <div class="card talk">
+        <h2>Conversa</h2>
+        <div class="log" id="log"></div>
+        <div class="talk-row">
+          <button class="mic" id="mic" title="Segure para falar (ou segure Espaço)">
+            <span class="mic-icon">🎤</span><span class="mic-label">Segure p/ falar</span>
+          </button>
+          <form class="text-form" id="textForm">
+            <input id="textInput" autocomplete="off" placeholder="ou digite… (ex: Bom dia! O que vai ser?)" />
+            <button class="btn" type="submit">Enviar</button>
+          </form>
+        </div>
+        <p class="hint" id="voiceHint"></p>
+      </div>
+
+      <div class="card prep">
+        <h2>Preparar</h2>
+        <div class="items" id="items"></div>
+        <div class="row">
+          <div class="seg" id="sizes">
+            <button data-size="P">P</button><button data-size="M" class="on">M</button><button data-size="G">G</button>
+          </div>
+        </div>
+        <div class="mods" id="mods"></div>
+        <div class="tray">
+          <div class="tray-title">Bandeja</div>
+          <ul id="tray"><li class="empty">vazia — escolha um item</li></ul>
+        </div>
+        <div class="row actions">
+          <button class="btn ghost" id="clearTray">Limpar</button>
+          <button class="btn primary" id="deliver" disabled>Entregar ☕</button>
+        </div>
+        <button class="btn link" id="bye">Encerrar atendimento</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- TELA INICIAL / ENTRE CLIENTES -->
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <div class="modal-emoji" id="modalEmoji">☕</div>
+      <h1 id="modalTitle">Café Interativo</h1>
+      <p id="modalText">Você é o barista. Converse, anote o pedido, prepare e entregue.</p>
+      <div class="pick" id="pick"></div>
+      <button class="btn primary big" id="start" disabled>Conectando…</button>
+      <p class="hint">Voz funciona no Chrome ou Edge. Permita o microfone quando pedir.</p>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

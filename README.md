@@ -28,6 +28,7 @@ Aprender agentes e MCP na prática exige um domínio com estado, regras e conver
 
 ```bash
 npm install
+npm run jogo       # jogo no navegador → http://localhost:3000 (Chrome/Edge para voz)
 npm run cliente -- dona-marta   # joga no terminal (requer CLI `claude` logado)
 npm test           # testes unitários
 npm run smoke      # teste ponta a ponta do MCP server
@@ -42,6 +43,8 @@ No Claude Code, o server `cafe` é registrado por `.mcp.json`. Para jogar no cha
 
 ```
 apps/
+  server/      HTTP + WebSocket; orquestra clientes (claude -p) e o MCP
+  web/public/  front sem build: cena SVG cartoon, voz nativa do navegador
   cli/         jogo no terminal (orquestrador em código)
 packages/
   agents/      CustomerAgent: cliente = processo `claude -p` em stream-json
@@ -60,4 +63,4 @@ data/          banco local (ignorado pelo git)
 
 ## Status
 
-Em desenvolvimento. Fase 0 (MCP server) e fase 1a/1b (cliente no chat do Claude Code e no terminal) concluídas. Próximo: server com WebSocket, depois voz e cena cartoon.
+Em desenvolvimento. Jogável no navegador com voz e personagens cartoon. Próximo: agente diretor com fila de vários clientes.

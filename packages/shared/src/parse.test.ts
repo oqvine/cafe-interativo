@@ -1,7 +1,7 @@
 // node --test: roda com `npm test`
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { MenuItem } from "@cafe/shared";
+import type { MenuItem } from "./index.ts";
 import { parseServe, splitAction } from "./parse.ts";
 
 const menu: MenuItem[] = [

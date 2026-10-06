@@ -13,7 +13,8 @@
     "inspect": "npx @modelcontextprotocol/inspector node packages/mcp-cafe/src/index.ts",
     "typecheck": "tsc -p .",
     "cliente": "node apps/cli/src/play.ts",
-    "test": "node --test \"apps/*/src/**/*.test.ts\" \"packages/*/src/**/*.test.ts\""
+    "test": "node --test \"apps/*/src/**/*.test.ts\" \"packages/*/src/**/*.test.ts\"",
+    "jogo": "node apps/server/src/main.ts"
   },
   "engines": {
     "node": ">=24"

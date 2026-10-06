@@ -1,0 +1,15 @@
+{
+  "name": "@cafe/server",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@cafe/agents": "*",
+    "@cafe/shared": "*",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "ws": "^8.18.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.0"
+  }
+}

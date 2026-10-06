@@ -8,7 +8,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { CustomerAgent, type Turn } from "@cafe/agents";
 import type { Customer, MenuItem, Order } from "@cafe/shared";
-import { parseServe, splitAction } from "./parse.ts";
+import { parseServe, splitAction } from "@cafe/shared/parse";
 
 const args = process.argv.slice(2);
 const debug = args.includes("--debug");

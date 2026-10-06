@@ -11,7 +11,9 @@
     "seed": "node packages/mcp-cafe/src/seed.ts",
     "smoke": "node packages/mcp-cafe/src/smoke.ts",
     "inspect": "npx @modelcontextprotocol/inspector node packages/mcp-cafe/src/index.ts",
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "cliente": "node apps/cli/src/play.ts",
+    "test": "node --test \"apps/*/src/**/*.test.ts\" \"packages/*/src/**/*.test.ts\""
   },
   "engines": {
     "node": ">=24"

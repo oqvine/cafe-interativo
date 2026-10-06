@@ -28,6 +28,8 @@ Aprender agentes e MCP na prática exige um domínio com estado, regras e conver
 
 ```bash
 npm install
+npm run cliente -- dona-marta   # joga no terminal (requer CLI `claude` logado)
+npm test           # testes unitários
 npm run smoke      # teste ponta a ponta do MCP server
 npm run inspect    # MCP Inspector no navegador
 npm run seed       # popula cardápio e clientes
@@ -39,7 +41,10 @@ No Claude Code, o server `cafe` é registrado por `.mcp.json`. Para jogar no cha
 ## Estrutura
 
 ```
+apps/
+  cli/         jogo no terminal (orquestrador em código)
 packages/
+  agents/      CustomerAgent: cliente = processo `claude -p` em stream-json
   shared/      contratos Zod (pedido, tamanho, emoção…)
   mcp-cafe/    MCP server: tools, resources, prompts
     src/server.ts   definição do server
@@ -55,4 +60,4 @@ data/          banco local (ignorado pelo git)
 
 ## Status
 
-Em desenvolvimento. Fase 0 concluída (MCP server). Próximo: clientes como agentes conversando por texto, depois voz e cena cartoon.
+Em desenvolvimento. Fase 0 (MCP server) e fase 1a/1b (cliente no chat do Claude Code e no terminal) concluídas. Próximo: clientes como agentes conversando por texto, depois voz e cena cartoon.

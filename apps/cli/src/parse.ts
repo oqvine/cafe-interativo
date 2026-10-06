@@ -13,6 +13,19 @@ const SIZE_WORDS: [RegExp, Size][] = [
 
 export const SERVE_RE = /^\s*(servir|entregar|toma)\b\s*/i;
 
+/**
+ * Separa fala de ação: "Tem sim, chefe. servir latte G" → { speech: "Tem sim, chefe.", action: "servir latte G" }.
+ * No meio da linha só vale "servir"/"entregar" começando uma frase nova (após . ! ? ; :).
+ * "posso te servir algo?" continua sendo fala. "toma" só no início (comum demais em fala).
+ */
+export function splitAction(line: string): { speech: string; action: string | null } {
+  if (SERVE_RE.test(line)) return { speech: "", action: line.trim() };
+  const m = line.match(/([.!?;:]\s*)(servir|entregar)\b/i);
+  if (!m || m.index === undefined) return { speech: line.trim(), action: null };
+  const at = m.index + m[1]!.length;
+  return { speech: line.slice(0, at).trim(), action: line.slice(at).trim() };
+}
+
 export function parseServe(text: string, menu: MenuItem[]): { items: OrderItem[]; unknown: string[] } {
   const body = norm(text.replace(SERVE_RE, ""));
   const items: OrderItem[] = [];

@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { MenuItem } from "@cafe/shared";
-import { parseServe } from "./parse.ts";
+import { parseServe, splitAction } from "./parse.ts";
 
 const menu: MenuItem[] = [
   { id: "latte", name: "Latte", description: "", prices: { P: 1, M: 1, G: 1 } },
@@ -31,4 +31,15 @@ test("vários itens com +", () => {
 
 test("item desconhecido", () => {
   assert.deepEqual(parseServe("servir frappuccino", menu).unknown, ["frappuccino"]);
+});
+
+test("fala + ação na mesma linha", () => {
+  assert.deepEqual(splitAction("Tem sim chefe. servir latte G com canela"), {
+    speech: "Tem sim chefe.",
+    action: "servir latte G com canela",
+  });
+  assert.deepEqual(splitAction("servir latte"), { speech: "", action: "servir latte" });
+  assert.deepEqual(splitAction("ele toma café todo dia"), { speech: "ele toma café todo dia", action: null });
+  assert.deepEqual(splitAction("posso te servir algo?"), { speech: "posso te servir algo?", action: null });
+  assert.deepEqual(splitAction("Prontinho! Entregar mocha P"), { speech: "Prontinho!", action: "Entregar mocha P" });
 });

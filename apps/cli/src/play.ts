@@ -7,8 +7,8 @@ import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { CustomerAgent, type Turn } from "@cafe/agents";
-import type { MenuItem, Order } from "@cafe/shared";
-import { parseServe, SERVE_RE } from "./parse.ts";
+import type { Customer, MenuItem, Order } from "@cafe/shared";
+import { parseServe, splitAction } from "./parse.ts";
 
 const args = process.argv.slice(2);
 const debug = args.includes("--debug");
@@ -33,6 +33,16 @@ async function call<T>(name: string, a: Record<string, unknown> = {}): Promise<T
 
 const menu = await call<MenuItem[]>("get_menu");
 
+// Nome de exibição via resource (leitura, sem "agir")
+let displayName = customerId;
+try {
+  const res = await mcp.readResource({ uri: `cafe://customers/${customerId}` });
+  displayName = (JSON.parse((res.contents[0] as { text: string }).text) as Customer).name;
+} catch {
+  console.error(styleText("red", `cliente '${customerId}' não existe.`));
+  process.exit(1);
+}
+
 // --- agente-cliente ---
 const agent = new CustomerAgent(customerId);
 let closed = false;
@@ -46,7 +56,7 @@ agent.on("tool", (name: string, input: unknown) => {
 if (debug) agent.on("stderr", (l: string) => console.error(dim(`   [claude] ${l}`)));
 
 function show(t: Turn): void {
-  const name = customerId;
+  const name = displayName;
   const emo = t.emotion ? `${EMOJI[t.emotion] ?? ""} ${t.emotion}` : "?";
   console.log(`\n${styleText("bold", name)} ${dim(`(${emo})`)}: ${t.speech}`);
   tokens = { input: tokens.input + t.usage.input, output: tokens.output + t.usage.output, cacheRead: tokens.cacheRead + t.usage.cacheRead };
@@ -66,29 +76,32 @@ async function say(text: string): Promise<Turn | null> {
   }
 }
 
-async function serve(line: string): Promise<void> {
-  const { items, unknown } = parseServe(line, menu);
-  if (unknown.length) console.log(dim(`   ? não entendi: ${unknown.join(", ")} (itens: ${menu.map((m) => m.id).join(", ")})`));
-  if (!items.length) return;
+/** Entrega. `speech` = o que o barista disse junto (pode ser vazio). Retorna false se não era entrega. */
+async function serve(action: string, speech: string): Promise<boolean> {
+  const { items, unknown } = parseServe(action, menu);
+  if (!items.length) return false; // nenhum item do cardápio: era só fala
+  if (unknown.length) console.log(dim(`   ? ignorado: ${unknown.join(", ")} (itens: ${menu.map((m) => m.id).join(", ")})`));
+  const said = speech ? ` O barista disse: "${speech}".` : "";
 
   const queue = await call<Order[]>("get_queue");
   const order = queue.filter((o) => o.customerId === customerId).at(-1);
   if (!order) {
-    await say("[EVENTO] O barista quer entregar, mas você ainda não registrou o pedido.");
-    return;
+    await say(`[EVENTO]${said} O barista quer entregar, mas você ainda não registrou o pedido.`);
+    return true;
   }
   const r = await call<{ points: number; accuracy: number; issues: string[] }>("serve", { orderId: order.id, prepared: items });
   const desc = items.map((i) => `${i.itemId} ${i.size}${i.modifiers.length ? ` (${i.modifiers.join(", ")})` : ""}`).join(" + ");
   await say(
-    `[EVENTO] O barista entregou: ${desc}. Avaliação: accuracy ${r.accuracy}, problemas: ${r.issues.join("; ") || "nenhum"}.`,
+    `[EVENTO]${said} O barista entregou: ${desc}. Avaliação: accuracy ${r.accuracy}, problemas: ${r.issues.join("; ") || "nenhum"}.`,
   );
   console.log(styleText("yellow", `   🎯 ${r.points} pts${r.issues.length ? " · " + r.issues.join(" · ") : " · perfeito"}`));
+  return true;
 }
 
 // --- loop ---
 console.log(styleText("bold", "☕ Café Interativo — terminal"));
 console.log(dim("Fale normalmente. 'servir latte G com canela' entrega. 'sair' encerra.\n"));
-console.log(dim(`chamando ${customerId}…`));
+console.log(dim(`chamando ${displayName}…`));
 
 const first = await say(`customerId: ${customerId}. Você acabou de entrar na cafeteria e chegou ao balcão. Diga sua primeira fala.`);
 const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -97,13 +110,14 @@ while (first && !closed) {
   const line = (await rl.question(styleText("cyan", "\nvocê › "))).trim();
   if (!line) continue;
   if (/^(sair|exit|quit)$/i.test(line)) break;
-  if (SERVE_RE.test(line)) await serve(line);
-  else await say(`Barista: "${line}"`);
+  const { speech, action } = splitAction(line);
+  if (action && (await serve(action, speech))) continue;
+  await say(`Barista: "${line}"`);
 }
 
 if (closed) {
   const s = await call<{ points: number; served: number; avgAccuracy: number | null }>("get_score");
-  console.log(styleText("green", `\n✔ ${customerId} foi embora. Placar geral: ${s.points} pts · ${s.served} servidos`));
+  console.log(styleText("green", `\n✔ ${displayName} foi embora. Placar geral: ${s.points} pts · ${s.served} servidos`));
 }
 console.log(dim(`tokens da sessão: in ${tokens.input} · out ${tokens.output} · cache ${tokens.cacheRead}`));
 rl.close();

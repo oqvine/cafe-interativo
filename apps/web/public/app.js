@@ -1,6 +1,6 @@
 // UI do jogo. Fala com apps/server via WebSocket (/ws).
 import { renderCustomer } from "./characters.js";
-import { createListener, speak, stopSpeaking, sttSupported, ttsSupported } from "./voice.js";
+import { createConversation, hasNaturalVoice, speak, stopSpeaking, sttSupported, ttsSupported } from "./voice.js";
 
 const $ = (id) => document.getElementById(id);
 const EMOJI_ITEM = { espresso: "☕", latte: "🥛", cappuccino: "☕", mocha: "🍫", "cold-brew": "🧊", "cha-mate": "🍋", "pao-de-queijo": "🧀" };
@@ -20,10 +20,15 @@ const state = {
   mods: new Set(),
   pick: null, // null = aleatório
   muted: false,
+  cc: false, // legendas: desligadas → conversa só por voz
+  talking: false, // TTS do cliente tocando
   leaving: false,
 };
 
-try { state.muted = localStorage.getItem("cafe.muted") === "1"; } catch { /* sem storage */ }
+try {
+  state.muted = localStorage.getItem("cafe.muted") === "1";
+  state.cc = localStorage.getItem("cafe.cc") === "1";
+} catch { /* sem storage */ }
 
 // ---------- WebSocket ----------
 let ws;
@@ -69,8 +74,13 @@ function onMessage(m) {
 
     case "thinking":
       setBusy(m.on);
-      $("customer").classList.toggle("thinking", m.on);
-      if (m.on) showBubble(null);
+      if (m.on) {
+        conv?.pause();
+        $("customer").classList.add("thinking");
+        showBubble(null);
+      } else {
+        resumeIfIdle();
+      }
       break;
 
     case "line": {
@@ -79,9 +89,12 @@ function onMessage(m) {
         state.emotion = emo;
         drawCustomer();
       }
-      showBubble(m.speech);
+      $("customer").classList.remove("thinking");
+      // Sem legenda e com voz: o balão some, a conversa é só falada.
+      if (state.cc || state.muted || !ttsSupported) showBubble(m.speech);
+      else $("bubble").classList.add("hidden");
       log("them", m.speech, `${state.current?.name ?? "cliente"} · ${emo} · ${(m.ms / 1000).toFixed(1)}s`);
-      speaking = say(m.speech);
+      speaking = say(m.speech).then(resumeIfIdle);
       break;
     }
 
@@ -114,6 +127,7 @@ function onMessage(m) {
 
     case "leave":
       state.leaving = true;
+      conv?.pause();
       setScore(m.score?.points ?? state.score);
       speaking.then(() => {
         $("customer").className = "customer leave";
@@ -156,9 +170,12 @@ function showBubble(text) {
 function say(text) {
   if (state.muted || !ttsSupported) return Promise.resolve();
   const el = $("customer");
+  state.talking = true;
   return speak(text, state.current?.id, {
     onStart: () => el.classList.add("talking"),
     onEnd: () => el.classList.remove("talking"),
+  }).finally(() => {
+    state.talking = false;
   });
 }
 
@@ -204,22 +221,13 @@ function setScore(n, pop = true) {
   }
 }
 
+// Textos ficam "por debaixo dos panos": só no console (F12) para depurar.
 function log(kind, text, meta) {
-  const d = document.createElement("div");
-  d.className = `msg ${kind}`;
-  d.textContent = text;
-  if (meta) {
-    const s = document.createElement("small");
-    s.textContent = ` — ${meta}`;
-    d.appendChild(s);
-  }
-  $("log").appendChild(d);
-  $("log").scrollTop = $("log").scrollHeight;
+  console.debug(`[${kind}] ${text}${meta ? ` — ${meta}` : ""}`);
 }
 
 function setBusy(on) {
   state.busy = on;
-  $("mic").disabled = on || !sttSupported;
   $("textInput").disabled = on;
   $("deliver").disabled = on || !state.tray.length;
   $("bye").disabled = on;
@@ -295,66 +303,76 @@ $("bye").addEventListener("click", () => {
   send({ type: "bye" });
 });
 
-// ---------- conversa ----------
+// ---------- conversa (mãos-livres) ----------
 function sendLine(text) {
   text = text.trim();
   if (!text || state.busy || !state.current || state.leaving) return;
   stopSpeaking();
+  conv?.pause(); // até o cliente responder
   log("me", text);
   send({ type: "say", text });
 }
 
+/** Reabre o microfone quando é a vez do barista: cliente parou de pensar e de falar. */
+function resumeIfIdle() {
+  if (!state.busy && !state.talking && !state.leaving && state.current) conv?.resume();
+}
+
+const MIC_TEXT = {
+  off: "microfone desligado — clique no 🎤",
+  listening: "pode falar…",
+  paused: "aguarde…",
+};
+
+const conv = createConversation({
+  onState: (s) => {
+    $("mic").className = `mic ${s}`;
+    $("micStatus").textContent = MIC_TEXT[s];
+  },
+  // Mostra o que está ouvindo só enquanto você fala (confirma que entendeu), depois some.
+  onInterim: (t) => {
+    $("mic").classList.toggle("hearing", Boolean(t));
+    $("micStatus").textContent = t ? `“${t}”` : MIC_TEXT[conv?.state ?? "off"];
+  },
+  onFinal: (t) => sendLine(t),
+  onError: (err) => toast(err === "not-allowed" ? "Microfone bloqueado. Libere nas permissões do site (cadeado na barra)." : `Voz: ${err}`, "bad"),
+});
+
+if (!sttSupported) {
+  $("mic").disabled = true;
+  $("micStatus").textContent = "voz indisponível — use Chrome/Edge ou ⌨";
+}
+
+$("mic").addEventListener("click", () => {
+  if (!conv) return;
+  conv.toggle();
+  if (conv.state !== "off" && (state.busy || state.talking || !state.current)) conv.pause();
+});
+
+// Teclado: reserva, escondido atrás do ⌨
+$("kbd").addEventListener("click", () => {
+  const f = $("textForm");
+  f.classList.toggle("hidden");
+  $("kbd").classList.toggle("on", !f.classList.contains("hidden"));
+  if (!f.classList.contains("hidden")) $("textInput").focus();
+});
 $("textForm").addEventListener("submit", (e) => {
   e.preventDefault();
   sendLine($("textInput").value);
   $("textInput").value = "";
 });
 
-const listener = createListener({
-  onState: (on) => {
-    $("mic").classList.toggle("on", on);
-    $("mic").querySelector(".mic-label").textContent = on ? "Ouvindo… solte p/ enviar" : "Segure p/ falar";
-  },
-  onInterim: (t) => ($("textInput").value = t),
-  onFinal: (t) => {
-    $("textInput").value = "";
-    sendLine(t);
-  },
-  onError: (err) => toast(err === "not-allowed" ? "Microfone bloqueado. Libere nas permissões do site." : `Voz: ${err}`, "bad"),
-});
-
-if (!sttSupported) {
-  $("voiceHint").textContent = "Reconhecimento de voz indisponível neste navegador — use Chrome ou Edge. Dá para digitar.";
-} else {
-  $("voiceHint").textContent = "Dica: fale “servir latte grande com canela” para entregar por voz.";
+// ---------- legendas ----------
+function renderCC() {
+  $("cc").classList.toggle("on", state.cc);
+  $("cc").title = state.cc ? "Legendas ligadas" : "Legendas desligadas";
 }
-
-const micDown = (e) => {
-  e.preventDefault();
-  if (!state.busy) {
-    stopSpeaking();
-    listener?.start();
-  }
-};
-const micUp = () => listener?.stop();
-$("mic").addEventListener("pointerdown", micDown);
-$("mic").addEventListener("pointerup", micUp);
-$("mic").addEventListener("pointerleave", micUp);
-
-// Espaço = push-to-talk (fora do campo de texto)
-let spaceDown = false;
-window.addEventListener("keydown", (e) => {
-  if (e.code !== "Space" || e.repeat || document.activeElement === $("textInput") || !$("overlay").classList.contains("hidden")) return;
-  e.preventDefault();
-  spaceDown = true;
-  micDown(e);
+$("cc").addEventListener("click", () => {
+  state.cc = !state.cc;
+  try { localStorage.setItem("cafe.cc", state.cc ? "1" : "0"); } catch { /* ok */ }
+  renderCC();
 });
-window.addEventListener("keyup", (e) => {
-  if (e.code === "Space" && spaceDown) {
-    spaceDown = false;
-    micUp();
-  }
-});
+renderCC();
 
 // ---------- som ----------
 function renderMute() {
@@ -386,7 +404,15 @@ $("pick").addEventListener("click", (e) => {
 
 $("start").addEventListener("click", () => {
   $("overlay").classList.add("hidden");
-  $("log").innerHTML = "";
+  // Microfone liga junto (clique = gesto do usuário, o navegador permite). Fica pausado até o cliente falar.
+  // Pede permissão agora (clique = gesto do usuário) e já solta o microfone.
+  navigator.mediaDevices?.getUserMedia({ audio: true }).then((st) => st.getTracks().forEach((t) => t.stop())).catch(() => {});
+  conv?.pause();
+  if (conv && conv.state === "off") conv.enable();
+  if (ttsSupported && !state.muted && !hasNaturalVoice() && !state.tipShown) {
+    state.tipShown = true;
+    setTimeout(() => toast("Dica: no Microsoft Edge as vozes soam bem mais naturais (grátis)."), 1500);
+  }
   setBusy(true);
   send({ type: "next", customerId: state.pick ?? undefined });
 });

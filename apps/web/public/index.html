@@ -14,6 +14,7 @@
     <div class="brand">☕ Café Interativo</div>
     <div class="topbar-right">
       <div class="chip" id="score">0 pts</div>
+      <button class="icon-btn" id="cc" title="Legendas">CC</button>
       <button class="icon-btn" id="mute" title="Voz dos clientes">🔊</button>
     </div>
   </header>
@@ -47,25 +48,20 @@
       </div>
 
       <div class="toast hidden" id="toast"></div>
+
+      <!-- voz: mãos-livres -->
+      <div class="voice-dock">
+        <button class="mic" id="mic" title="Ligar/desligar microfone">🎤</button>
+        <div class="mic-status" id="micStatus">microfone desligado — clique no 🎤</div>
+        <button class="icon-btn small" id="kbd" title="Digitar em vez de falar">⌨</button>
+        <form class="text-form hidden" id="textForm">
+          <input id="textInput" autocomplete="off" placeholder="digite e Enter" />
+        </form>
+      </div>
     </section>
 
     <!-- PAINEL -->
     <section class="panel">
-      <div class="card talk">
-        <h2>Conversa</h2>
-        <div class="log" id="log"></div>
-        <div class="talk-row">
-          <button class="mic" id="mic" title="Segure para falar (ou segure Espaço)">
-            <span class="mic-icon">🎤</span><span class="mic-label">Segure p/ falar</span>
-          </button>
-          <form class="text-form" id="textForm">
-            <input id="textInput" autocomplete="off" placeholder="ou digite… (ex: Bom dia! O que vai ser?)" />
-            <button class="btn" type="submit">Enviar</button>
-          </form>
-        </div>
-        <p class="hint" id="voiceHint"></p>
-      </div>
-
       <div class="card prep">
         <h2>Preparar</h2>
         <div class="items" id="items"></div>
@@ -96,7 +92,7 @@
       <p id="modalText">Você é o barista. Converse, anote o pedido, prepare e entregue.</p>
       <div class="pick" id="pick"></div>
       <button class="btn primary big" id="start" disabled>Conectando…</button>
-      <p class="hint">Voz funciona no Chrome ou Edge. Permita o microfone quando pedir.</p>
+      <p class="hint">Fale normalmente — o microfone liga sozinho e envia quando você faz uma pausa. Use Chrome ou Edge e permita o microfone.</p>
     </div>
   </div>
 

@@ -60,4 +60,4 @@ data/          banco local (ignorado pelo git)
 
 ## Status
 
-Em desenvolvimento. Fase 0 (MCP server) e fase 1a/1b (cliente no chat do Claude Code e no terminal) concluídas. Próximo: clientes como agentes conversando por texto, depois voz e cena cartoon.
+Em desenvolvimento. Fase 0 (MCP server) e fase 1a/1b (cliente no chat do Claude Code e no terminal) concluídas. Próximo: server com WebSocket, depois voz e cena cartoon.

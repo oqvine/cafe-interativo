@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
-import { Emotion } from "@cafe/shared";
+import { Emotion, type MenuItem } from "@cafe/shared";
 
 const ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const AGENT_FILE = `${ROOT}.claude/agents/cliente.md`;
@@ -34,16 +34,24 @@ export type Turn = {
   raw: string; // texto completo do modelo
   emotion: Emotion | null;
   speech: string; // fala sem a tag de emoção
+  tip: number | null; // gorjeta escrita na tag: "[encantado +5]" (modo headless, sem tool react)
   tools: { name: string; input: unknown }[];
   usage: Usage;
   ms: number;
 };
 
-type Pending = { resolve: (t: Turn) => void; reject: (e: Error) => void; texts: string[]; tools: Turn["tools"] };
+type Pending = {
+  resolve: (t: Turn) => void;
+  reject: (e: Error) => void;
+  texts: string[];
+  tools: Turn["tools"];
+  spoke?: Line; // fala já emitida neste turno
+};
 
 /**
  * Eventos:
  *  - "ready"  (init)              processo subiu, MCP conectado
+ *  - "speech" (Line)              fala pronta — antes do turno acabar (tools ainda rodando)
  *  - "tool"   (name, input)       cliente chamou uma tool (ex: create_order)
  *  - "stderr" (line)              saída de erro do claude
  *  - "exit"   (code)
@@ -54,10 +62,23 @@ export class CustomerAgent extends EventEmitter {
   #proc: ChildProcessWithoutNullStreams | null = null;
   #pending: Pending | null = null;
 
-  constructor(customerId: string, def = loadAgentDef()) {
+  /**
+   * inlineReact: a reação vem na própria fala ("[feliz +3] ...") e o orquestrador registra.
+   * Economiza uma ida ao modelo por entrega. A tool `react` fica bloqueada.
+   */
+  readonly inlineReact: boolean;
+
+  constructor(customerId: string, opts: { def?: AgentDef; inlineReact?: boolean } = {}) {
     super();
     this.customerId = customerId;
-    this.def = def;
+    this.def = opts.def ?? loadAgentDef();
+    this.inlineReact = opts.inlineReact ?? true;
+  }
+
+  /** Sobe o processo já (sem mandar mensagem = sem gastar token). Útil para pré-aquecer. */
+  warm(): this {
+    if (!this.#proc) this.start();
+    return this;
   }
 
   start(): void {
@@ -75,7 +96,7 @@ export class CustomerAgent extends EventEmitter {
       "--mcp-config", mcpConfig,
       "--strict-mcp-config", // ignora outros MCPs do usuário
       "--allowedTools", this.def.tools.join(","),
-      "--disallowedTools", BARISTA_TOOLS.join(","),
+      "--disallowedTools", [...BARISTA_TOOLS, ...(this.inlineReact ? ["mcp__cafe__react"] : [])].join(","),
       "--permission-mode", "dontAsk", // o que não está liberado é negado, sem perguntar
       "--no-session-persistence",
     ];
@@ -131,7 +152,15 @@ export class CustomerAgent extends EventEmitter {
         break;
       case "assistant":
         for (const c of e.message?.content ?? []) {
-          if (c.type === "text") p?.texts.push(c.text);
+          if (c.type === "text") {
+            p?.texts.push(c.text);
+            // Fala sai assim que chega: tools (create_order…) terminam em segundo plano.
+            const line = p && !p.spoke ? parseLine(c.text) : null;
+            if (p && line) {
+              p.spoke = line;
+              this.emit("speech", line);
+            }
+          }
           if (c.type === "tool_use") {
             p?.tools.push({ name: c.name, input: c.input });
             this.emit("tool", c.name, c.input);
@@ -146,15 +175,11 @@ export class CustomerAgent extends EventEmitter {
           p.reject(new Error(raw || "erro no turno"));
           break;
         }
-        // A última linha não vazia é a fala (o modelo pode ter "pensado alto" antes).
-        const last = raw.split("\n").filter((l) => l.trim()).at(-1) ?? "";
-        const m = last.match(/^\s*\[([^\]]+)\]\s*(.*)$/s);
-        const emo = m ? Emotion.safeParse(m[1]!.trim().toLowerCase()) : null;
+        const line = p.spoke ?? parseLine(raw) ?? { emotion: null, tip: null, speech: raw.split("\n").filter((l) => l.trim()).at(-1) ?? "" };
         const u = e.usage ?? {};
         p.resolve({
           raw,
-          emotion: emo?.success ? emo.data : null,
-          speech: m ? m[2]!.trim() : last.trim(),
+          ...line,
           tools: p.tools,
           usage: {
             input: u.input_tokens ?? 0,
@@ -168,4 +193,48 @@ export class CustomerAgent extends EventEmitter {
       }
     }
   }
+}
+
+export type Line = { emotion: Emotion | null; tip: number | null; speech: string };
+
+/**
+ * Acha a PRIMEIRA linha "[emoção] fala" ou "[emoção +gorjeta] fala".
+ * Primeira, porque comentários de bastidor costumam vir depois.
+ */
+export function parseLine(text: string): Line | null {
+  for (const l of text.split("\n")) {
+    const m = l.match(/^\s*\[([^\]]+)\]\s*(.+)$/);
+    if (!m) continue;
+    const tag = m[1]!.trim().toLowerCase().match(/^([a-zà-ú]+)\s*(?:\+\s*(\d+))?/);
+    const emo = tag ? Emotion.safeParse(tag[1]) : null;
+    return {
+      emotion: emo?.success ? emo.data : null,
+      tip: tag?.[2] !== undefined ? Math.min(50, Number(tag[2])) : null,
+      speech: m[2]!.trim(),
+    };
+  }
+  return null;
+}
+
+/**
+ * Primeira mensagem já com persona + cardápio: o cliente não precisa chamar
+ * get_persona/get_menu (2 idas ao modelo a menos → chegada bem mais rápida).
+ */
+export function openingMessage(customerId: string, persona: string, menu: MenuItem[]): string {
+  const cardapio = menu
+    .map((m) => `- ${m.id} (${m.name}): P ${m.prices.P} · M ${m.prices.M} · G ${m.prices.G}`)
+    .join("\n");
+  return `customerId: ${customerId}
+
+## Persona (já carregada, não chame get_persona)
+${persona}
+
+## Cardápio (ids válidos, não chame get_menu)
+${cardapio}
+
+## Neste modo
+Não existe a tool react. Ao reagir a um café servido, ponha a gorjeta (0-50) na tag: \`[encantado +8] fala\`.
+Fora isso, a tag é só a emoção: \`[neutro] fala\`.
+
+Você acabou de entrar na cafeteria e chegou ao balcão. Diga sua primeira fala.`;
 }

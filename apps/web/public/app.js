@@ -381,6 +381,7 @@ $("pick").addEventListener("click", (e) => {
   if (!b) return;
   state.pick = b.dataset.pick || null;
   renderPick();
+  send({ type: "warm", customerId: state.pick ?? undefined }); // sobe o processo do cliente já
 });
 
 $("start").addEventListener("click", () => {

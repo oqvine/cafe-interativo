@@ -6,7 +6,7 @@ import { styleText } from "node:util";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { CustomerAgent, type Turn } from "@cafe/agents";
+import { CustomerAgent, openingMessage, type Turn } from "@cafe/agents";
 import type { Customer, MenuItem, Order } from "@cafe/shared";
 import { parseServe, splitAction } from "@cafe/shared/parse";
 
@@ -91,9 +91,12 @@ async function serve(action: string, speech: string): Promise<boolean> {
   }
   const r = await call<{ points: number; accuracy: number; issues: string[] }>("serve", { orderId: order.id, prepared: items });
   const desc = items.map((i) => `${i.itemId} ${i.size}${i.modifiers.length ? ` (${i.modifiers.join(", ")})` : ""}`).join(" + ");
-  await say(
-    `[EVENTO]${said} O barista entregou: ${desc}. Avaliação: accuracy ${r.accuracy}, problemas: ${r.issues.join("; ") || "nenhum"}.`,
+  const t = await say(
+    `[EVENTO]${said} O barista entregou: ${desc}. Avaliação: accuracy ${r.accuracy}, problemas: ${r.issues.join("; ") || "nenhum"}. Reaja com a gorjeta na tag, ex: [feliz +5].`,
   );
+  // reação inline → o orquestrador registra
+  if (t) await call("react", { customerId, emotion: t.emotion ?? "neutro", tip: t.tip ?? 0 }).catch(() => {});
+  if (t?.tip) console.log(styleText("green", `   💰 gorjeta +${t.tip}`));
   console.log(styleText("yellow", `   🎯 ${r.points} pts${r.issues.length ? " · " + r.issues.join(" · ") : " · perfeito"}`));
   return true;
 }
@@ -103,7 +106,8 @@ console.log(styleText("bold", "☕ Café Interativo — terminal"));
 console.log(dim("Fale normalmente. 'servir latte G com canela' entrega. 'sair' encerra.\n"));
 console.log(dim(`chamando ${displayName}…`));
 
-const first = await say(`customerId: ${customerId}. Você acabou de entrar na cafeteria e chegou ao balcão. Diga sua primeira fala.`);
+const persona = ((await mcp.callTool({ name: "get_persona", arguments: { customerId } })).content as { text: string }[])[0]!.text;
+const first = await say(openingMessage(customerId, persona, menu));
 const rl = createInterface({ input: process.stdin, output: process.stdout });
 
 while (first && !closed) {

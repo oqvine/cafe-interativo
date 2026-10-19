@@ -46,6 +46,7 @@ type Pending = {
   texts: string[];
   tools: Turn["tools"];
   spoke?: Line; // fala já emitida neste turno
+  stream: string; // texto parcial do bloco atual (--include-partial-messages)
 };
 
 /**
@@ -99,9 +100,12 @@ export class CustomerAgent extends EventEmitter {
       "--disallowedTools", [...BARISTA_TOOLS, ...(this.inlineReact ? ["mcp__cafe__react"] : [])].join(","),
       "--permission-mode", "dontAsk", // o que não está liberado é negado, sem perguntar
       "--no-session-persistence",
+      "--include-partial-messages", // texto chega em pedaços: a fala sai antes da mensagem fechar
     ];
     // cwd fora do projeto: evita carregar CLAUDE.md e .claude/ (contexto à toa = token à toa)
-    const proc = spawn(process.env.CLAUDE_BIN ?? "claude", args, { cwd: tmpdir(), stdio: ["pipe", "pipe", "pipe"] });
+    // MAX_THINKING_TOKENS=0: sem "thinking" antes de cada fala. Medido: 1ª palavra 4,0s → 1,0s, ~10x menos tokens.
+    const env = { ...process.env, MAX_THINKING_TOKENS: process.env.CAFE_THINKING ?? "0" };
+    const proc = spawn(process.env.CLAUDE_BIN ?? "claude", args, { cwd: tmpdir(), env, stdio: ["pipe", "pipe", "pipe"] });
     this.#proc = proc;
 
     createInterface({ input: proc.stdout }).on("line", (line) => this.#onLine(line));
@@ -128,6 +132,7 @@ export class CustomerAgent extends EventEmitter {
         reject,
         texts: [],
         tools: [],
+        stream: "",
       };
       const msg = { type: "user", message: { role: "user", content: text } };
       this.#proc!.stdin.write(JSON.stringify(msg) + "\n");
@@ -136,6 +141,14 @@ export class CustomerAgent extends EventEmitter {
 
   close(): void {
     this.#proc?.stdin.end();
+  }
+
+  #speak(p: Pending, text: string): void {
+    if (p.spoke) return;
+    const line = parseLine(text);
+    if (!line || !line.speech) return;
+    p.spoke = line;
+    this.emit("speech", line);
   }
 
   #onLine(line: string): void {
@@ -150,16 +163,25 @@ export class CustomerAgent extends EventEmitter {
       case "system":
         if (e.subtype === "init") this.emit("ready", e);
         break;
+      case "stream_event": {
+        // Pedaços do texto enquanto o modelo escreve. Emite a fala assim que a linha com tag fecha.
+        const ev = e.event;
+        if (!p || p.spoke) break;
+        if (ev?.type === "content_block_start") p.stream = "";
+        if (ev?.delta?.type === "text_delta") {
+          p.stream += ev.delta.text;
+          const nl = p.stream.indexOf(String.fromCharCode(10), p.stream.search(/\[[^\]]+\]/));
+          if (nl > 0) this.#speak(p, p.stream.slice(0, nl));
+        }
+        if (ev?.type === "content_block_stop" && p.stream) this.#speak(p, p.stream);
+        break;
+      }
       case "assistant":
         for (const c of e.message?.content ?? []) {
           if (c.type === "text") {
             p?.texts.push(c.text);
             // Fala sai assim que chega: tools (create_order…) terminam em segundo plano.
-            const line = p && !p.spoke ? parseLine(c.text) : null;
-            if (p && line) {
-              p.spoke = line;
-              this.emit("speech", line);
-            }
+            if (p) this.#speak(p, c.text);
           }
           if (c.type === "tool_use") {
             p?.tools.push({ name: c.name, input: c.input });

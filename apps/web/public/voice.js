@@ -9,7 +9,7 @@ export const ttsSupported = "speechSynthesis" in window;
  * pause()/resume() fecham o microfone enquanto o cliente pensa/fala (evita captar o TTS).
  *   onInterim(texto parcial) · onFinal(frase) · onState("off" | "listening" | "paused") · onError(código)
  */
-export function createConversation({ onInterim, onFinal, onState, onError, silenceMs = 1000 }) {
+export function createConversation({ onInterim, onFinal, onState, onError, silenceMs = 750 }) {
   if (!Recognition) return null;
   let rec = null;
   let enabled = false; // usuário ligou o microfone

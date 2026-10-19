@@ -159,7 +159,7 @@ function forSpeech(text) {
 }
 
 /** Fala o texto. Resolve quando termina. onStart/onEnd animam a boca. */
-export function speak(text, customerId, { onStart, onEnd } = {}) {
+export function speak(text, customerId, { onStart, onEnd, onWord } = {}) {
   return new Promise((resolve) => {
     if (!ttsSupported || !text) return resolve();
     speechSynthesis.cancel();
@@ -175,6 +175,7 @@ export function speak(text, customerId, { onStart, onEnd } = {}) {
       resolve();
     };
     u.onstart = () => onStart?.();
+    u.onboundary = (ev) => ev.name === "word" && onWord?.();
     u.onend = done;
     u.onerror = done;
     speechSynthesis.speak(u);

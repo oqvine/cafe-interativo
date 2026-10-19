@@ -1,10 +1,14 @@
 // UI do jogo. Fala com apps/server via WebSocket (/ws).
-import { renderCustomer } from "./characters.js";
+import { renderCustomer, startLipSync } from "./characters.js";
+import { drinkSVG } from "./drinks.js";
+import { fillBoard, renderBackground, renderCounter } from "./scene.js";
 import { createConversation, hasNaturalVoice, speak, stopSpeaking, sttSupported, ttsSupported } from "./voice.js";
 
 const $ = (id) => document.getElementById(id);
-const EMOJI_ITEM = { espresso: "☕", latte: "🥛", cappuccino: "☕", mocha: "🍫", "cold-brew": "🧊", "cha-mate": "🍋", "pao-de-queijo": "🧀" };
 const EMOJI_EMO = { feliz: ["😊", "✨"], encantado: ["😍", "💖", "⭐"], neutro: ["👍"], impaciente: ["⏱", "💨"], irritado: ["💢", "😠"], confuso: ["❓", "🤔"] };
+const ICON_SOUND = `<svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
+const ICON_MUTED = `<svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16 9l5 6M21 9l-5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+const DICE = `<svg viewBox="0 0 62 62"><rect x="11" y="11" width="40" height="40" rx="10" fill="#fff" stroke="#4a2f22" stroke-width="3"/><g fill="#4a2f22"><circle cx="22" cy="22" r="4"/><circle cx="31" cy="31" r="4"/><circle cx="40" cy="40" r="4"/></g></svg>`;
 const brl = (n) => `R$ ${Number(n).toFixed(2).replace(".", ",")}`;
 
 const state = {
@@ -54,6 +58,7 @@ function onMessage(m) {
       state.customers = m.customers;
       setScore(m.score?.points ?? 0, false);
       renderMenu();
+      fillBoard($("sceneBg"), state.menu);
       renderPick();
       $("start").disabled = false;
       $("start").textContent = "Abrir a cafeteria";
@@ -105,7 +110,7 @@ function onMessage(m) {
 
     case "served": {
       const cups = state.lastServed ?? [];
-      $("cupZone").innerHTML = cups.map((i) => `<span class="cup">${EMOJI_ITEM[i.itemId] ?? "☕"}</span>`).join("");
+      $("cupZone").innerHTML = cups.map((i) => drinkSVG(i.itemId, 80)).join("");
       setScore(state.score + m.points);
       const good = m.accuracy >= 0.99;
       toast(good ? `Perfeito! +${m.points} pts` : `+${m.points} pts · ${m.issues.join(" · ")}`, good ? "good" : "bad");
@@ -171,11 +176,20 @@ function say(text) {
   if (state.muted || !ttsSupported) return Promise.resolve();
   const el = $("customer");
   state.talking = true;
+  let lips = null;
   return speak(text, state.current?.id, {
-    onStart: () => el.classList.add("talking"),
-    onEnd: () => el.classList.remove("talking"),
+    onStart: () => {
+      el.classList.add("talking");
+      lips = startLipSync(el);
+    },
+    onWord: () => lips?.word(),
+    onEnd: () => {
+      el.classList.remove("talking");
+      lips?.stop();
+    },
   }).finally(() => {
     state.talking = false;
+    lips?.stop();
   });
 }
 
@@ -237,10 +251,8 @@ function setBusy(on) {
 const itemName = (id) => state.menu.find((m) => m.id === id)?.name ?? id;
 
 function renderMenu() {
-  $("menuBoard").innerHTML =
-    "<b>CARDÁPIO</b>" + state.menu.map((m) => `<div><span>${m.name}</span><span>${m.prices.P}·${m.prices.M}·${m.prices.G}</span></div>`).join("");
   $("items").innerHTML = state.menu
-    .map((m) => `<button data-id="${m.id}" title="${m.description}"><span>${EMOJI_ITEM[m.id] ?? "☕"}</span>${m.name}</button>`)
+    .map((m) => `<button data-id="${m.id}" title="${m.description}">${drinkSVG(m.id, 54)}${m.name}</button>`)
     .join("");
   $("mods").innerHTML = state.modifiers.map((x) => `<button data-mod="${x}">${x}</button>`).join("");
 }
@@ -272,7 +284,7 @@ function renderTray() {
     ? state.tray
         .map(
           (i, n) =>
-            `<li><span>${EMOJI_ITEM[i.itemId] ?? "☕"} ${itemName(i.itemId)} ${i.size}${i.modifiers.length ? ` <small>(${i.modifiers.join(", ")})</small>` : ""}</span><button data-rm="${n}" title="remover">✕</button></li>`,
+            `<li><span>${drinkSVG(i.itemId, 34)} ${itemName(i.itemId)} ${i.size}${i.modifiers.length ? ` <small>(${i.modifiers.join(", ")})</small>` : ""}</span><button data-rm="${n}" title="remover">✕</button></li>`,
         )
         .join("")
     : `<li class="empty">vazia — escolha tamanho/adicionais e clique num item</li>`;
@@ -376,7 +388,7 @@ renderCC();
 
 // ---------- som ----------
 function renderMute() {
-  $("mute").textContent = state.muted ? "🔇" : "🔊";
+  $("mute").innerHTML = state.muted ? ICON_MUTED : ICON_SOUND;
   $("mute").title = state.muted ? "Voz desligada" : "Voz ligada";
 }
 $("mute").addEventListener("click", () => {
@@ -389,10 +401,14 @@ renderMute();
 
 // ---------- overlay ----------
 function renderPick() {
-  const opts = [{ id: null, name: "🎲 Aleatório" }, ...state.customers];
+  const opts = [{ id: null, name: "Surpresa", archetype: "quem chegar" }, ...state.customers];
   $("pick").innerHTML = opts
-    .map((c) => `<button data-pick="${c.id ?? ""}" class="${(c.id ?? null) === state.pick ? "on" : ""}" title="${c.archetype ?? ""}">${c.name}</button>`)
+    .map(
+      (c) => `<button data-pick="${c.id ?? ""}" class="${(c.id ?? null) === state.pick ? "on" : ""}">
+        <span class="face">${c.id ? renderCustomer(c.id, "feliz") : DICE}</span>${c.name}<small>${c.archetype ?? ""}</small></button>`,
+    )
     .join("");
+  if (!$("modalArt").innerHTML) $("modalArt").innerHTML = state.customers.map((c) => renderCustomer(c.id, "feliz")).join("");
 }
 $("pick").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-pick]");
@@ -419,7 +435,7 @@ $("start").addEventListener("click", () => {
 
 function betweenCustomers(score) {
   const name = state.current?.name ?? "O cliente";
-  $("modalEmoji").textContent = "👋";
+  $("modalArt").innerHTML = state.current ? renderCustomer(state.current.id, (state.score ?? 0) > 0 ? "encantado" : "neutro") : "";
   $("modalTitle").textContent = `${name} foi embora`;
   $("modalText").textContent = `Placar: ${score?.points ?? state.score} pts · ${score?.served ?? 0} cafés servidos. Chamar o próximo?`;
   $("start").textContent = "Próximo cliente";
@@ -428,6 +444,9 @@ function betweenCustomers(score) {
   $("overlay").classList.remove("hidden");
 }
 
+$("sceneBg").innerHTML = renderBackground();
+$("sceneFg").innerHTML = renderCounter();
+document.querySelector(".brand-cup").innerHTML = drinkSVG("latte", 34);
 renderTray();
 setBusy(true);
 connect();

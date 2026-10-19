@@ -16,7 +16,8 @@ Jogo de barista: clientes são agentes Claude, voz no navegador. Projeto pessoal
 - `packages/shared` — schemas Zod/tipos compartilhados.
 - `packages/agents` — `CustomerAgent`: 1 cliente = 1 processo `claude -p` vivo (stream-json). Lê system prompt/tools/model de `.claude/agents/cliente.md` (fonte única p/ subagent e headless). Roda com cwd = tmpdir (não carrega CLAUDE.md). **Não usar `--bare`** (pula login da assinatura).
 - `apps/server` — `npm run jogo` (http://localhost:3000): HTTP estático + WebSocket `/ws`; 1 `Session` por aba, 1 `CustomerAgent` por cliente. Texto/voz com "servir …" também entrega (`@cafe/shared/parse`).
-- `apps/web/public` — front sem build (JS puro): `app.js` (UI/WS), `characters.js` (SVG cartoon por emoção), `voice.js` (Web Speech STT + speechSynthesis TTS).
+- `apps/web/public` — front sem build (JS puro): `app.js` (UI/WS), `scene.js` (cenário ilustrado: fundo + balcão; cliente fica entre os dois), `characters.js` (personagens SVG por emoção, visemas p/ lip-sync), `drinks.js` (bebidas ilustradas), `voice.js` (STT mãos-livres + TTS com vozes neurais).
+- Latência: clientes rodam com `MAX_THINKING_TOKENS=0` + `--include-partial-messages` (fala sai ~1-2s). `CAFE_THINKING` sobrescreve.
 - `apps/cli` — jogo no terminal; orquestrador em código (parser determinístico do `servir`, MCP client próprio).
 - `packages/mcp-cafe` — MCP server `cafe` (tools/resources/prompts). Registrado em `.mcp.json` via stdio.
   - `server.ts` define tudo, `index.ts` = stdio, `smoke.ts` = cliente MCP em memória (teste).
@@ -41,7 +42,7 @@ Jogo de barista: clientes são agentes Claude, voz no navegador. Projeto pessoal
    - 1a ✅ subagent `cliente` + skill `/atender`
    - 1b ✅ `npm run cliente` (headless `claude -p`)
    - 1c ✅ `apps/server` com WebSocket
-2. ✅ Voz MVP (push-to-talk, Espaço)
-3. ✅ Cena cartoon SVG + emoções
+2. ✅ Voz mãos-livres (pausa envia) + vozes neurais do navegador
+3. ✅ Cena ilustrada SVG + personagens com emoções, piscada e lip-sync
 4. Director + fila + pontuação
 5. Memória de recorrentes, VAD
